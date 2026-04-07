@@ -113,12 +113,14 @@ class FakeTraktClient:
 
     async def add_to_history(self, trakt_id, *, media_type="show", watched_at=None):
         """Record an add-to-history call."""
-        self.history_calls.append({
-            "trakt_id": trakt_id,
-            "media_type": media_type,
-            "watched_at": watched_at,
-            "action": "add",
-        })
+        self.history_calls.append(
+            {
+                "trakt_id": trakt_id,
+                "media_type": media_type,
+                "watched_at": watched_at,
+                "action": "add",
+            }
+        )
         return {"added": {"shows": 1}}
 
     async def remove_from_history(self, trakt_id, *, media_type="show"):
@@ -128,15 +130,15 @@ class FakeTraktClient:
         self._movie_list_cache.pop(trakt_id, None)
         return {"deleted": {"shows": 1}}
 
-    async def rate_media(
-        self, trakt_id, rating, *, media_type="show", rated_at=None
-    ):
+    async def rate_media(self, trakt_id, rating, *, media_type="show", rated_at=None):
         """Record a rate-media call."""
-        self.rating_calls.append({
-            "trakt_id": trakt_id,
-            "rating": rating,
-            "media_type": media_type,
-        })
+        self.rating_calls.append(
+            {
+                "trakt_id": trakt_id,
+                "rating": rating,
+                "media_type": media_type,
+            }
+        )
         return {"added": {"shows": 1}}
 
     async def remove_rating(self, trakt_id, *, media_type="show"):
@@ -146,11 +148,13 @@ class FakeTraktClient:
 
     async def add_to_watchlist(self, trakt_id, *, media_type="show"):
         """Record an add-to-watchlist call."""
-        self.watchlist_calls.append({
-            "trakt_id": trakt_id,
-            "media_type": media_type,
-            "action": "add",
-        })
+        self.watchlist_calls.append(
+            {
+                "trakt_id": trakt_id,
+                "media_type": media_type,
+                "action": "add",
+            }
+        )
         return {"added": {"shows": 1}}
 
     async def remove_from_watchlist(self, trakt_id, *, media_type="show"):

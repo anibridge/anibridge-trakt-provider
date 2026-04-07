@@ -424,9 +424,7 @@ class TraktClient:
         else:
             payload = {"shows": [{"ids": {"trakt": trakt_id}}]}
 
-        result = await self._make_request(
-            "POST", "/sync/history/remove", json=payload
-        )
+        result = await self._make_request("POST", "/sync/history/remove", json=payload)
         self._list_cache.pop(trakt_id, None)
         self._movie_list_cache.pop(trakt_id, None)
         self._invalidate_cached_views()
@@ -450,9 +448,7 @@ class TraktClient:
             "rated_at": rated_at.isoformat(),
         }
         key = "movies" if media_type == "movie" else "shows"
-        result = await self._make_request(
-            "POST", "/sync/ratings", json={key: [entry]}
-        )
+        result = await self._make_request("POST", "/sync/ratings", json={key: [entry]})
         self._rating_cache.pop(trakt_id, None)
         return result
 
@@ -550,12 +546,9 @@ class TraktClient:
                         )
 
                     if response.status == 429:
-                        retry_after = response.headers.get(
-                            "Retry-After", "unknown"
-                        )
+                        retry_after = response.headers.get("Retry-After", "unknown")
                         raise aiohttp.ClientError(
-                            f"Trakt API rate limited (429). "
-                            f"Retry-After: {retry_after}"
+                            f"Trakt API rate limited (429). Retry-After: {retry_after}"
                         )
 
                     response.raise_for_status()

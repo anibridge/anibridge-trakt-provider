@@ -170,9 +170,7 @@ class TraktWatchedShow(TraktBaseModel):
     show: TraktShow | None = None
     seasons: list[TraktWatchedSeason] = Field(default_factory=list)
 
-    @field_validator(
-        "last_watched_at", "last_updated_at", "reset_at", mode="before"
-    )
+    @field_validator("last_watched_at", "last_updated_at", "reset_at", mode="before")
     @classmethod
     def _parse_datetime(cls, value: Any) -> datetime | Any:
         if value in (None, ""):

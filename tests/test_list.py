@@ -25,9 +25,7 @@ class TestTraktListMedia:
         entry = TraktListEntry(trakt_provider, show=show)
         assert entry.media().media_type is ListMediaType.TV
 
-    def test_movie_media_type_is_movie(
-        self, trakt_provider: TraktListProvider
-    ) -> None:
+    def test_movie_media_type_is_movie(self, trakt_provider: TraktListProvider) -> None:
         movie = make_movie(trakt_id=100)
         entry = TraktListEntry(trakt_provider, movie=movie)
         assert entry.media().media_type is ListMediaType.MOVIE
@@ -37,9 +35,7 @@ class TestTraktListMedia:
         entry = TraktListEntry(trakt_provider, show=show)
         assert entry.media().total_units == 24
 
-    def test_movie_total_units_is_1(
-        self, trakt_provider: TraktListProvider
-    ) -> None:
+    def test_movie_total_units_is_1(self, trakt_provider: TraktListProvider) -> None:
         movie = make_movie(trakt_id=100)
         entry = TraktListEntry(trakt_provider, movie=movie)
         assert entry.media().total_units == 1
@@ -84,18 +80,14 @@ class TestTraktListEntry:
         self, trakt_provider: TraktListProvider
     ) -> None:
         watched = make_watched_show(trakt_id=1, episode_count=6, aired_episodes=12)
-        entry = TraktListEntry(
-            trakt_provider, show=watched.show, watched=watched
-        )
+        entry = TraktListEntry(trakt_provider, show=watched.show, watched=watched)
         assert entry.status is ListStatus.CURRENT
 
     def test_status_completed_when_all_watched(
         self, trakt_provider: TraktListProvider
     ) -> None:
         watched = make_watched_show(trakt_id=1, episode_count=12, aired_episodes=12)
-        entry = TraktListEntry(
-            trakt_provider, show=watched.show, watched=watched
-        )
+        entry = TraktListEntry(trakt_provider, show=watched.show, watched=watched)
         assert entry.status is ListStatus.COMPLETED
 
     def test_status_setter(self, trakt_provider: TraktListProvider) -> None:
@@ -108,9 +100,7 @@ class TestTraktListEntry:
         self, trakt_provider: TraktListProvider
     ) -> None:
         watched = make_watched_show(trakt_id=1, episode_count=6)
-        entry = TraktListEntry(
-            trakt_provider, show=watched.show, watched=watched
-        )
+        entry = TraktListEntry(trakt_provider, show=watched.show, watched=watched)
         assert entry.progress == 6
 
     def test_progress_setter(self, trakt_provider: TraktListProvider) -> None:
@@ -119,9 +109,7 @@ class TestTraktListEntry:
         entry.progress = 5
         assert entry.progress == 5
 
-    def test_progress_rejects_negative(
-        self, trakt_provider: TraktListProvider
-    ) -> None:
+    def test_progress_rejects_negative(self, trakt_provider: TraktListProvider) -> None:
         show = make_show(trakt_id=1)
         entry = TraktListEntry(trakt_provider, show=show)
         with pytest.raises(ValueError, match="negative"):
@@ -129,9 +117,7 @@ class TestTraktListEntry:
 
     def test_repeats_from_plays(self, trakt_provider: TraktListProvider) -> None:
         watched = make_watched_show(trakt_id=1, plays=3, episode_count=12)
-        entry = TraktListEntry(
-            trakt_provider, show=watched.show, watched=watched
-        )
+        entry = TraktListEntry(trakt_provider, show=watched.show, watched=watched)
         assert entry.repeats == 2
 
     def test_repeats_setter(self, trakt_provider: TraktListProvider) -> None:
@@ -140,9 +126,7 @@ class TestTraktListEntry:
         entry.repeats = 2
         assert entry.repeats == 2
 
-    def test_repeats_rejects_negative(
-        self, trakt_provider: TraktListProvider
-    ) -> None:
+    def test_repeats_rejects_negative(self, trakt_provider: TraktListProvider) -> None:
         show = make_show(trakt_id=1)
         entry = TraktListEntry(trakt_provider, show=show)
         with pytest.raises(ValueError, match="negative"):
@@ -184,18 +168,14 @@ class TestTraktListEntry:
         entry.review = "Updated review"
         assert entry.review == "Updated review"
 
-    def test_started_at_from_watchlist(
-        self, trakt_provider: TraktListProvider
-    ) -> None:
+    def test_started_at_from_watchlist(self, trakt_provider: TraktListProvider) -> None:
         now = datetime.now(tz=UTC)
         show = make_show(trakt_id=1)
         wl = TraktWatchlistItem(show=show, listed_at=now)
         entry = TraktListEntry(trakt_provider, show=show, watchlist_item=wl)
         assert entry.started_at == now
 
-    def test_movie_entry_progress(
-        self, trakt_provider: TraktListProvider
-    ) -> None:
+    def test_movie_entry_progress(self, trakt_provider: TraktListProvider) -> None:
         watched_movie = make_watched_movie(trakt_id=100, plays=1)
         entry = TraktListEntry(
             trakt_provider, movie=watched_movie.movie, watched_movie=watched_movie
@@ -315,9 +295,7 @@ class TestTraktListProvider:
     ) -> None:
         watched = make_watched_show(trakt_id=1, plays=2)
         fake_client._list_cache[1] = watched
-        fake_client._rating_cache[1] = TraktRating(
-            rating=9, show=watched.show
-        )
+        fake_client._rating_cache[1] = TraktRating(rating=9, show=watched.show)
 
         backup = await trakt_provider.backup_list()
         import json
@@ -340,6 +318,7 @@ class TestTraktListProvider:
     ) -> None:
         watched = make_watched_show(trakt_id=1, title="Show 1", episode_count=6)
         fake_client._list_cache[1] = watched
+        assert watched.show is not None
         fake_client._media_cache[1] = watched.show
 
         results = await trakt_provider.get_entries_batch(["1", "999"])

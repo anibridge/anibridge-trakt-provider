@@ -327,9 +327,7 @@ class TraktListProvider(ListProvider):
                 key=self._client.user.username,
                 title=self._client.user.name or self._client.user.username,
             )
-            self.log.debug(
-                "Trakt provider initialized for user %s", self._user.key
-            )
+            self.log.debug("Trakt provider initialized for user %s", self._user.key)
         else:
             raise RuntimeError("Trakt provider initialized without a resolved user")
 
@@ -481,9 +479,7 @@ class TraktListProvider(ListProvider):
     async def search(self, query: str) -> Sequence[TraktListEntry]:
         """Search Trakt and return entries with minimal metadata."""
         results = await self._client.search_shows(query, limit=10)
-        self.log.debug(
-            "Trakt search query=%r yielded %s entries", query, len(results)
-        )
+        self.log.debug("Trakt search query=%r yielded %s entries", query, len(results))
         entries: list[TraktListEntry] = []
         for result in results:
             if result.show is not None:
@@ -504,9 +500,7 @@ class TraktListProvider(ListProvider):
         if trakt_entry._pending_status is not _UNSET:
             status = cast(ListStatus | None, trakt_entry._pending_status)
             if status is ListStatus.PLANNING:
-                await self._client.add_to_watchlist(
-                    trakt_id, media_type=media_type
-                )
+                await self._client.add_to_watchlist(trakt_id, media_type=media_type)
             elif status in (
                 ListStatus.CURRENT,
                 ListStatus.COMPLETED,
@@ -521,9 +515,7 @@ class TraktListProvider(ListProvider):
                     trakt_id, media_type=media_type, watched_at=watched_at
                 )
             elif status is None:
-                await self._client.remove_from_history(
-                    trakt_id, media_type=media_type
-                )
+                await self._client.remove_from_history(trakt_id, media_type=media_type)
                 await self._client.remove_from_watchlist(
                     trakt_id, media_type=media_type
                 )
@@ -537,9 +529,7 @@ class TraktListProvider(ListProvider):
                     trakt_id, trakt_rating, media_type=media_type
                 )
             else:
-                await self._client.remove_rating(
-                    trakt_id, media_type=media_type
-                )
+                await self._client.remove_rating(trakt_id, media_type=media_type)
 
         self.log.debug("Updated Trakt entry for id %s", key)
 

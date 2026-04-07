@@ -38,7 +38,9 @@ class _StubResponse:
     def raise_for_status(self) -> None:
         if self.status >= 400 and self.status not in (401, 403, 429):
             raise aiohttp.ClientResponseError(
-                request_info=cast(Any, SimpleNamespace(real_url="https://trakt.example")),
+                request_info=cast(
+                    Any, SimpleNamespace(real_url="https://trakt.example")
+                ),
                 history=(),
                 status=self.status,
                 message="error",
@@ -183,9 +185,7 @@ async def test_make_request_retries_bad_gateway(
 async def test_make_request_fails_on_unauthorized(
     trakt_client: TraktClient,
 ) -> None:
-    session = _StubSession(
-        responses=[_StubResponse(status=401)]
-    )
+    session = _StubSession(responses=[_StubResponse(status=401)])
     trakt_client._session = cast(aiohttp.ClientSession, session)
 
     with pytest.raises(aiohttp.ClientError, match="unauthorized"):
@@ -197,9 +197,7 @@ async def test_search_shows_caches_results(
     trakt_client: TraktClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_make_request(
-        method: str, path: str, **kwargs: Any
-    ) -> Any:
+    async def fake_make_request(method: str, path: str, **kwargs: Any) -> Any:
         assert method == "GET"
         assert path == "/search/show"
         return [
@@ -270,9 +268,8 @@ async def test_initialize_sets_user_and_primes_cache(
     async def fake_get_settings():
         calls.append("settings")
         from anibridge.providers.list.trakt.models import TraktUser, TraktUserSettings
-        return TraktUserSettings(
-            user=TraktUser(username="tester", name="Test User")
-        )
+
+        return TraktUserSettings(user=TraktUser(username="tester", name="Test User"))
 
     async def fake_fetch_watched_shows():
         calls.append("watched_shows")
@@ -299,7 +296,11 @@ async def test_initialize_sets_user_and_primes_cache(
     await trakt_client.initialize()
 
     assert calls == [
-        "settings", "watched_shows", "watched_movies", "ratings", "watchlist"
+        "settings",
+        "watched_shows",
+        "watched_movies",
+        "ratings",
+        "watchlist",
     ]
     assert trakt_client.user is not None
     assert trakt_client.user.username == "tester"

@@ -1,6 +1,6 @@
 """Tests for the Trakt models."""
 
-from datetime import date
+from datetime import date, datetime
 
 from anibridge.providers.list.trakt.models import (
     TraktEpisode,
@@ -29,7 +29,9 @@ class TestTraktIds:
         assert ids.tmdb is None
 
     def test_from_dict(self) -> None:
-        ids = TraktIds(**{"trakt": 123, "slug": "test", "imdb": "tt1234567"})
+        ids = TraktIds.model_validate(
+            {"trakt": 123, "slug": "test", "imdb": "tt1234567"}
+        )
         assert ids.trakt == 123
         assert ids.slug == "test"
         assert ids.imdb == "tt1234567"
@@ -57,7 +59,9 @@ class TestTraktShow:
         assert len(show.genres) == 2
 
     def test_first_aired_datetime_parsing(self) -> None:
-        show = TraktShow(title="Test", first_aired="2024-01-15T20:00:00.000Z")
+        show = TraktShow(
+            title="Test", first_aired=datetime.fromisoformat("2024-01-15T20:00:00.000Z")
+        )
         assert show.first_aired is not None
         assert show.first_aired.year == 2024
 
@@ -66,7 +70,7 @@ class TestTraktShow:
         assert show.first_aired is None
 
     def test_extra_fields_ignored(self) -> None:
-        show = TraktShow(title="Test", unknown_field="value")
+        show = TraktShow(title="Test", unknown_field="value")  # type: ignore
         assert show.title == "Test"
 
 
@@ -76,7 +80,7 @@ class TestTraktMovie:
         assert movie.title == "Test Movie"
 
     def test_released_date_parsing(self) -> None:
-        movie = TraktMovie(title="Test", released="2024-06-15")
+        movie = TraktMovie(title="Test", released=date.fromisoformat("2024-06-15"))
         assert movie.released == date(2024, 6, 15)
 
     def test_released_none(self) -> None:
@@ -106,7 +110,7 @@ class TestTraktWatchedShow:
     def test_datetime_parsing(self) -> None:
         watched = TraktWatchedShow(
             plays=1,
-            last_watched_at="2024-01-15T20:00:00.000Z",
+            last_watched_at=datetime.fromisoformat("2024-01-15T20:00:00.000Z"),
             show=TraktShow(title="Test"),
         )
         assert watched.last_watched_at is not None
@@ -134,7 +138,7 @@ class TestTraktRating:
     def test_rated_at_parsing(self) -> None:
         rating = TraktRating(
             rating=9,
-            rated_at="2024-03-10T12:00:00.000Z",
+            rated_at=datetime.fromisoformat("2024-03-10T12:00:00.000Z"),
         )
         assert rating.rated_at is not None
 
@@ -174,7 +178,7 @@ class TestTraktHistoryItem:
     def test_history_item(self) -> None:
         item = TraktHistoryItem(
             id=1,
-            watched_at="2024-05-20T10:00:00.000Z",
+            watched_at=datetime.fromisoformat("2024-05-20T10:00:00.000Z"),
             action="watch",
             type="episode",
             episode=TraktEpisode(season=1, number=1, title="Pilot"),
