@@ -313,6 +313,7 @@ class TraktListProvider(ListProvider):
         self._client = TraktClient(
             logger=self.log,
             client_id=self.parsed_config.client_id,
+            client_secret=self.parsed_config.client_secret,
             token=self.parsed_config.token,
             rate_limit=self.parsed_config.rate_limit,
         )

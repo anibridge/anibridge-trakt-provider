@@ -14,6 +14,10 @@ class TraktListProviderConfig(BaseModel):
         default="fab91d3719c4206245850c46022ba5a571677ee62a886cfd8da8fc93db4e9f7c",
         description="Trakt API client ID for authentication.",
     )
+    client_secret: str = Field(
+        default=...,
+        description="Trakt API client secret for authentication.",
+    )
     rate_limit: int | None = Field(
         default=None,
         ge=1,

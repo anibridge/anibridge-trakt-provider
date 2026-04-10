@@ -26,6 +26,12 @@ Your Trakt OAuth refresh token. You can generate one [here](https://anibridge.el
 
 Your Trakt API client ID. The default value is AniBridge's official Trakt application ID. You can create your own at [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications).
 
+### `client_secret`
+
+`str` (optional, default: `"d58b8bfcc63f8e372ff932f78c3ff5ebad0a2c99910a2cce380bf313808e2bbd"`)
+
+Your Trakt API client secret. The default value is AniBridge's official Trakt application secret. You can create your own at [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications).
+
 ### `rate_limit`
 
 `int | None` (optional, default: `null`)

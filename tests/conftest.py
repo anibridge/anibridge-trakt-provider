@@ -237,6 +237,7 @@ async def trakt_provider(
     provider = TraktListProvider(
         config={
             "client_id": "test-client-id",
+            "client_secret": "test-client-secret",
             "token": "test-token",
         },
         logger=cast(ProviderLogger, getLogger("anibridge.providers.list.trakt")),

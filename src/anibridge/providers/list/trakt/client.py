@@ -42,13 +42,17 @@ class TraktClient:
         *,
         logger: ProviderLogger,
         client_id: str,
+        client_secret: str,
         token: str,
         rate_limit: int | None = None,
     ) -> None:
         """Construct the client with the required credentials."""
         self.log = logger
         self.client_id = client_id
-        self.token = token
+        self.client_secret = client_secret
+        self._refresh_token = token
+        self._access_token: str | None = None
+        self._access_token_expiry: datetime | None = None
         self._session: aiohttp.ClientSession | None = None
         self.rate_limit = rate_limit
 
@@ -78,8 +82,57 @@ class TraktClient:
         self._rating_cache: dict[int, TraktRating] = {}
         self._watchlist_cache: dict[int, TraktWatchlistItem] = {}
 
+    async def _ensure_access_token(self) -> str:
+        """Ensure we have a valid access token, refreshing if needed."""
+        if (
+            self._access_token is not None
+            and self._access_token_expiry is not None
+            and datetime.now(UTC) < self._access_token_expiry
+        ):
+            return self._access_token
+
+        self.log.debug("Refreshing Trakt OAuth access token")
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                f"{self.API_URL}/oauth/token",
+                json={
+                    "refresh_token": self._refresh_token,
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                    "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+                    "grant_type": "refresh_token",
+                },
+            ) as response,
+        ):
+            if response.status >= 400:
+                raise aiohttp.ClientError(
+                    f"Failed to refresh Trakt OAuth token ({response.status}). "
+                    "Verify your refresh token and client credentials."
+                )
+            data = await response.json()
+
+        self._access_token = data["access_token"]
+        self._refresh_token = data["refresh_token"]
+        expires_in: int = data.get("expires_in", 7776000)
+        created_at: int = data.get("created_at", int(datetime.now(UTC).timestamp()))
+        self._access_token_expiry = datetime.fromtimestamp(
+            created_at + expires_in, tz=UTC
+        )
+        self.log.debug(
+            "Trakt access token refreshed, expires at %s", self._access_token_expiry
+        )
+
+        # Invalidate the existing session so it picks up the new token.
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+        return self._access_token
+
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create the aiohttp session."""
+        access_token = await self._ensure_access_token()
         if self._session is None or self._session.closed:
             headers = {
                 "Accept": "application/json",
@@ -88,7 +141,7 @@ class TraktClient:
                 + importlib.metadata.version("anibridge-trakt-provider"),
                 "trakt-api-version": "2",
                 "trakt-api-key": self.client_id,
-                "Authorization": f"Bearer {self.token}",
+                "Authorization": f"Bearer {access_token}",
             }
             self._session = aiohttp.ClientSession(headers=headers)
         return self._session

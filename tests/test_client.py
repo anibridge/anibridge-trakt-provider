@@ -1,5 +1,6 @@
 """Tests for the Trakt API client."""
 
+from datetime import UTC, datetime
 from logging import getLogger
 from types import SimpleNamespace
 from typing import Any, cast
@@ -71,22 +72,29 @@ class _StubSession:
 
 @pytest.fixture()
 def trakt_client() -> TraktClient:
-    return TraktClient(
+    client = TraktClient(
         logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
         client_id="test-client-id",
+        client_secret="test-client-secret",
         token="test-token",
     )
+    # Pre-set access token so tests skip the OAuth refresh flow.
+    client._access_token = "test-access-token"
+    client._access_token_expiry = datetime(2099, 1, 1, tzinfo=UTC)
+    return client
 
 
 def test_default_rate_limiter_is_shared_across_clients() -> None:
     first = TraktClient(
         logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
         client_id="client-id",
+        client_secret="secret",
         token="token",
     )
     second = TraktClient(
         logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
         client_id="client-id",
+        client_secret="secret",
         token="token",
     )
 
@@ -99,12 +107,14 @@ def test_custom_rate_limiter_is_local_per_client() -> None:
     first = TraktClient(
         logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
         client_id="client-id",
+        client_secret="secret",
         token="token",
         rate_limit=120,
     )
     second = TraktClient(
         logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
         client_id="client-id",
+        client_secret="secret",
         token="token",
         rate_limit=120,
     )
