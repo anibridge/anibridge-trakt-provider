@@ -7,6 +7,7 @@ from datetime import UTC, datetime, tzinfo
 from typing import Any, ClassVar
 
 import aiohttp
+import msgspec
 from anibridge.utils.cache import TTLDict, ttl_cache
 from anibridge.utils.limiter import Limiter
 from anibridge.utils.types import ProviderLogger
@@ -192,7 +193,7 @@ class TraktClient:
     async def get_settings(self) -> TraktUserSettings:
         """Fetch the authenticated user's settings."""
         response = await self._make_request("GET", "/users/settings")
-        return TraktUserSettings(**response)
+        return msgspec.convert(response, type=TraktUserSettings)
 
     async def get_show(
         self,
@@ -217,7 +218,7 @@ class TraktClient:
             f"/shows/{trakt_id}",
             params={"extended": "full"},
         )
-        show = TraktShow(**response)
+        show = msgspec.convert(response, type=TraktShow)
         if show.ids.trakt is not None:
             self._show_cache[show.ids.trakt] = show
         return show
@@ -251,7 +252,7 @@ class TraktClient:
         )
         results: list[TraktSearchResult] = []
         for item in response:
-            result = TraktSearchResult(**item)
+            result = msgspec.convert(item, type=TraktSearchResult)
             if result.show and result.show.ids.trakt is not None:
                 self._show_cache[result.show.ids.trakt] = result.show
             results.append(result)
@@ -297,7 +298,7 @@ class TraktClient:
 
         results: list[TraktSearchResult] = []
         for item in response:
-            result = TraktSearchResult(**item)
+            result = msgspec.convert(item, type=TraktSearchResult)
             if result.show and result.show.ids.trakt is not None:
                 self._show_cache[result.show.ids.trakt] = result.show
             if result.movie and result.movie.ids.trakt is not None:
@@ -326,7 +327,7 @@ class TraktClient:
         refreshed: dict[int, TraktWatchedShow] = {}
         results: list[TraktWatchedShow] = []
         for item in response:
-            watched = TraktWatchedShow(**item)
+            watched = msgspec.convert(item, type=TraktWatchedShow)
             results.append(watched)
             if watched.show and watched.show.ids.trakt is not None:
                 trakt_id = watched.show.ids.trakt
@@ -361,7 +362,7 @@ class TraktClient:
         refreshed: dict[int, TraktWatchedMovie] = {}
         results: list[TraktWatchedMovie] = []
         for item in response:
-            watched = TraktWatchedMovie(**item)
+            watched = msgspec.convert(item, type=TraktWatchedMovie)
             results.append(watched)
             if watched.movie and watched.movie.ids.trakt is not None:
                 trakt_id = watched.movie.ids.trakt
@@ -386,7 +387,7 @@ class TraktClient:
                 f"/users/{self.user.username}/ratings/{media_type}",
             )
             for item in response:
-                rating = TraktRating(**item)
+                rating = msgspec.convert(item, type=TraktRating)
                 trakt_id = None
                 if rating.show and rating.show.ids.trakt is not None:
                     trakt_id = rating.show.ids.trakt
@@ -408,7 +409,7 @@ class TraktClient:
         )
         self._watchlist_cache.clear()
         for item in response:
-            wl_item = TraktWatchlistItem(**item)
+            wl_item = msgspec.convert(item, type=TraktWatchlistItem)
             trakt_id = None
             if wl_item.show and wl_item.show.ids.trakt is not None:
                 trakt_id = wl_item.show.ids.trakt
@@ -564,7 +565,7 @@ class TraktClient:
             "GET",
             f"/users/me/history/{media_type}/{trakt_id}",
         )
-        return [TraktHistoryItem(**item) for item in response]
+        return [msgspec.convert(item, type=TraktHistoryItem) for item in response]
 
     async def _make_request(
         self,

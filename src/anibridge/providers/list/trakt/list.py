@@ -6,6 +6,7 @@ from datetime import datetime
 from json import JSONDecodeError
 from typing import Any, cast
 
+import msgspec
 from anibridge.list import (
     ListEntry,
     ListMedia,
@@ -309,7 +310,7 @@ class TraktListProvider(ListProvider):
     def __init__(self, *, logger: ProviderLogger, config: dict | None = None) -> None:
         """Create the Trakt list provider with required credentials."""
         super().__init__(logger=logger, config=config)
-        self.parsed_config = TraktListProviderConfig.model_validate(config or {})
+        self.parsed_config = msgspec.convert(config or {}, type=TraktListProviderConfig)
         self._client = TraktClient(
             logger=self.log,
             client_id=self.parsed_config.client_id,

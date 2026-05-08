@@ -2,6 +2,8 @@
 
 from datetime import date, datetime
 
+import msgspec
+
 from anibridge.providers.list.trakt.models import (
     TraktEpisode,
     TraktHistoryItem,
@@ -29,8 +31,9 @@ class TestTraktIds:
         assert ids.tmdb is None
 
     def test_from_dict(self) -> None:
-        ids = TraktIds.model_validate(
-            {"trakt": 123, "slug": "test", "imdb": "tt1234567"}
+        ids = msgspec.convert(
+            {"trakt": 123, "slug": "test", "imdb": "tt1234567"},
+            type=TraktIds,
         )
         assert ids.trakt == 123
         assert ids.slug == "test"
@@ -70,7 +73,10 @@ class TestTraktShow:
         assert show.first_aired is None
 
     def test_extra_fields_ignored(self) -> None:
-        show = TraktShow(title="Test", unknown_field="value")  # type: ignore
+        show = msgspec.convert(
+            {"title": "Test", "unknown_field": "value"},
+            type=TraktShow,
+        )
         assert show.title == "Test"
 
 

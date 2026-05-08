@@ -1,17 +1,15 @@
 """Models for the Trakt API."""
 
-import contextlib
+from __future__ import annotations
+
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+import msgspec
 
 
-class TraktBaseModel(BaseModel):
+class TraktBaseModel(msgspec.Struct, kw_only=True):
     """Base model for Trakt responses."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 
 class TraktIds(TraktBaseModel):
@@ -56,7 +54,7 @@ class TraktShow(TraktBaseModel):
 
     title: str
     year: int | None = None
-    ids: TraktIds = Field(default_factory=TraktIds)
+    ids: TraktIds = msgspec.field(default_factory=TraktIds)
     overview: str | None = None
     first_aired: datetime | None = None
     runtime: int | None = None
@@ -67,20 +65,9 @@ class TraktShow(TraktBaseModel):
     homepage: str | None = None
     status: str | None = None
     aired_episodes: int | None = None
-    genres: list[str] = Field(default_factory=list)
+    genres: list[str] = msgspec.field(default_factory=list)
     language: str | None = None
-    languages: list[str] = Field(default_factory=list)
-
-    @field_validator("first_aired", mode="before")
-    @classmethod
-    def _parse_datetime(cls, value: Any) -> datetime | Any:
-        if value in (None, ""):
-            return None
-        if isinstance(value, datetime):
-            return value
-        with contextlib.suppress(ValueError):
-            return datetime.fromisoformat(str(value))
-        return value
+    languages: list[str] = msgspec.field(default_factory=list)
 
 
 class TraktMovie(TraktBaseModel):
@@ -88,7 +75,7 @@ class TraktMovie(TraktBaseModel):
 
     title: str
     year: int | None = None
-    ids: TraktIds = Field(default_factory=TraktIds)
+    ids: TraktIds = msgspec.field(default_factory=TraktIds)
     overview: str | None = None
     released: date | None = None
     runtime: int | None = None
@@ -96,24 +83,9 @@ class TraktMovie(TraktBaseModel):
     trailer: str | None = None
     homepage: str | None = None
     status: str | None = None
-    genres: list[str] = Field(default_factory=list)
+    genres: list[str] = msgspec.field(default_factory=list)
     language: str | None = None
-    languages: list[str] = Field(default_factory=list)
-
-    @field_validator("released", mode="before")
-    @classmethod
-    def _parse_date(cls, value: Any) -> date | None | Any:
-        if value in (None, ""):
-            return None
-        if isinstance(value, datetime):
-            return value.date()
-        if isinstance(value, date):
-            return value
-        if not isinstance(value, str):
-            return value
-        with contextlib.suppress(ValueError):
-            return date.fromisoformat(str(value))
-        return None
+    languages: list[str] = msgspec.field(default_factory=list)
 
 
 class TraktWatchlistItem(TraktBaseModel):
@@ -127,17 +99,6 @@ class TraktWatchlistItem(TraktBaseModel):
     show: TraktShow | None = None
     movie: TraktMovie | None = None
 
-    @field_validator("listed_at", mode="before")
-    @classmethod
-    def _parse_datetime(cls, value: Any) -> datetime | Any:
-        if value in (None, ""):
-            return None
-        if isinstance(value, datetime):
-            return value
-        with contextlib.suppress(ValueError):
-            return datetime.fromisoformat(str(value))
-        return value
-
 
 class TraktRating(TraktBaseModel):
     """A user's rating for a media item."""
@@ -148,17 +109,6 @@ class TraktRating(TraktBaseModel):
     show: TraktShow | None = None
     movie: TraktMovie | None = None
 
-    @field_validator("rated_at", mode="before")
-    @classmethod
-    def _parse_datetime(cls, value: Any) -> datetime | Any:
-        if value in (None, ""):
-            return None
-        if isinstance(value, datetime):
-            return value
-        with contextlib.suppress(ValueError):
-            return datetime.fromisoformat(str(value))
-        return value
-
 
 class TraktWatchedShow(TraktBaseModel):
     """A watched show entry from the user's history."""
@@ -168,25 +118,14 @@ class TraktWatchedShow(TraktBaseModel):
     last_updated_at: datetime | None = None
     reset_at: datetime | None = None
     show: TraktShow | None = None
-    seasons: list[TraktWatchedSeason] = Field(default_factory=list)
-
-    @field_validator("last_watched_at", "last_updated_at", "reset_at", mode="before")
-    @classmethod
-    def _parse_datetime(cls, value: Any) -> datetime | Any:
-        if value in (None, ""):
-            return None
-        if isinstance(value, datetime):
-            return value
-        with contextlib.suppress(ValueError):
-            return datetime.fromisoformat(str(value))
-        return value
+    seasons: list[TraktWatchedSeason] = msgspec.field(default_factory=list)
 
 
 class TraktWatchedSeason(TraktBaseModel):
     """A watched season within a watched show."""
 
     number: int | None = None
-    episodes: list[TraktWatchedEpisode] = Field(default_factory=list)
+    episodes: list[TraktWatchedEpisode] = msgspec.field(default_factory=list)
 
 
 class TraktWatchedEpisode(TraktBaseModel):
@@ -196,17 +135,6 @@ class TraktWatchedEpisode(TraktBaseModel):
     plays: int | None = None
     last_watched_at: datetime | None = None
 
-    @field_validator("last_watched_at", mode="before")
-    @classmethod
-    def _parse_datetime(cls, value: Any) -> datetime | Any:
-        if value in (None, ""):
-            return None
-        if isinstance(value, datetime):
-            return value
-        with contextlib.suppress(ValueError):
-            return datetime.fromisoformat(str(value))
-        return value
-
 
 class TraktWatchedMovie(TraktBaseModel):
     """A watched movie entry from the user's history."""
@@ -215,17 +143,6 @@ class TraktWatchedMovie(TraktBaseModel):
     last_watched_at: datetime | None = None
     last_updated_at: datetime | None = None
     movie: TraktMovie | None = None
-
-    @field_validator("last_watched_at", "last_updated_at", mode="before")
-    @classmethod
-    def _parse_datetime(cls, value: Any) -> datetime | Any:
-        if value in (None, ""):
-            return None
-        if isinstance(value, datetime):
-            return value
-        with contextlib.suppress(ValueError):
-            return datetime.fromisoformat(str(value))
-        return value
 
 
 class TraktSearchResult(TraktBaseModel):
@@ -251,7 +168,7 @@ class TraktUser(TraktBaseModel):
     name: str | None = None
     vip: bool = False
     vip_ep: bool = False
-    ids: TraktIds = Field(default_factory=TraktIds)
+    ids: TraktIds = msgspec.field(default_factory=TraktIds)
 
 
 class TraktHistoryItem(TraktBaseModel):
@@ -265,17 +182,6 @@ class TraktHistoryItem(TraktBaseModel):
     movie: TraktMovie | None = None
     episode: TraktEpisode | None = None
 
-    @field_validator("watched_at", mode="before")
-    @classmethod
-    def _parse_datetime(cls, value: Any) -> datetime | Any:
-        if value in (None, ""):
-            return None
-        if isinstance(value, datetime):
-            return value
-        with contextlib.suppress(ValueError):
-            return datetime.fromisoformat(str(value))
-        return value
-
 
 class TraktEpisode(TraktBaseModel):
     """Episode resource returned by Trakt."""
@@ -283,4 +189,4 @@ class TraktEpisode(TraktBaseModel):
     season: int | None = None
     number: int | None = None
     title: str | None = None
-    ids: TraktIds = Field(default_factory=TraktIds)
+    ids: TraktIds = msgspec.field(default_factory=TraktIds)

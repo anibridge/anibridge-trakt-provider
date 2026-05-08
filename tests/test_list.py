@@ -10,7 +10,7 @@ from anibridge.providers.list.trakt.models import (
     TraktRating,
     TraktWatchlistItem,
 )
-from tests.conftest import (
+from anibridge.providers.list.trakt.testing import (
     FakeTraktClient,
     make_movie,
     make_show,
