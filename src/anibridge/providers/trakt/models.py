@@ -1,6 +1,4 @@
-"""Models for the Trakt API."""
-
-from __future__ import annotations
+"""Trakt API models."""
 
 from datetime import date, datetime
 from enum import StrEnum
@@ -49,6 +47,51 @@ class TraktShowStatus(StrEnum):
     ENDED = "ended"
 
 
+class TraktMovie(TraktBaseModel):
+    """Movie resource as returned by Trakt."""
+
+    title: str
+    year: int | None = None
+    ids: TraktIds = msgspec.field(default_factory=TraktIds)
+    overview: str | None = None
+    released: date | None = None
+    runtime: int | None = None
+    certification: str | None = None
+    trailer: str | None = None
+    homepage: str | None = None
+    status: str | None = None
+    genres: list[str] = msgspec.field(default_factory=list)
+    language: str | None = None
+    languages: list[str] = msgspec.field(default_factory=list)
+
+
+class TraktEpisode(TraktBaseModel):
+    """Episode resource returned by Trakt."""
+
+    season: int | None = None
+    number: int | None = None
+    title: str | None = None
+    ids: TraktIds = msgspec.field(default_factory=TraktIds)
+    overview: str | None = None
+    first_aired: datetime | None = None
+    updated_at: datetime | None = None
+    runtime: int | None = None
+
+
+class TraktSeason(TraktBaseModel):
+    """Season resource returned by Trakt."""
+
+    number: int | None = None
+    ids: TraktIds = msgspec.field(default_factory=TraktIds)
+    title: str | None = None
+    overview: str | None = None
+    first_aired: datetime | None = None
+    updated_at: datetime | None = None
+    episode_count: int | None = None
+    aired_episodes: int | None = None
+    episodes: list[TraktEpisode] = msgspec.field(default_factory=list)
+
+
 class TraktShow(TraktBaseModel):
     """Show resource as returned by Trakt."""
 
@@ -70,24 +113,6 @@ class TraktShow(TraktBaseModel):
     languages: list[str] = msgspec.field(default_factory=list)
 
 
-class TraktMovie(TraktBaseModel):
-    """Movie resource as returned by Trakt."""
-
-    title: str
-    year: int | None = None
-    ids: TraktIds = msgspec.field(default_factory=TraktIds)
-    overview: str | None = None
-    released: date | None = None
-    runtime: int | None = None
-    certification: str | None = None
-    trailer: str | None = None
-    homepage: str | None = None
-    status: str | None = None
-    genres: list[str] = msgspec.field(default_factory=list)
-    language: str | None = None
-    languages: list[str] = msgspec.field(default_factory=list)
-
-
 class TraktWatchlistItem(TraktBaseModel):
     """An item in a user's watchlist."""
 
@@ -98,6 +123,8 @@ class TraktWatchlistItem(TraktBaseModel):
     type: str | None = None
     show: TraktShow | None = None
     movie: TraktMovie | None = None
+    episode: TraktEpisode | None = None
+    season: TraktSeason | None = None
 
 
 class TraktRating(TraktBaseModel):
@@ -108,6 +135,23 @@ class TraktRating(TraktBaseModel):
     type: str | None = None
     show: TraktShow | None = None
     movie: TraktMovie | None = None
+    episode: TraktEpisode | None = None
+    season: TraktSeason | None = None
+
+
+class TraktWatchedEpisode(TraktBaseModel):
+    """A watched episode within a watched season."""
+
+    number: int | None = None
+    plays: int | None = None
+    last_watched_at: datetime | None = None
+
+
+class TraktWatchedSeason(TraktBaseModel):
+    """A watched season within a watched show."""
+
+    number: int | None = None
+    episodes: list[TraktWatchedEpisode] = msgspec.field(default_factory=list)
 
 
 class TraktWatchedShow(TraktBaseModel):
@@ -119,21 +163,6 @@ class TraktWatchedShow(TraktBaseModel):
     reset_at: datetime | None = None
     show: TraktShow | None = None
     seasons: list[TraktWatchedSeason] = msgspec.field(default_factory=list)
-
-
-class TraktWatchedSeason(TraktBaseModel):
-    """A watched season within a watched show."""
-
-    number: int | None = None
-    episodes: list[TraktWatchedEpisode] = msgspec.field(default_factory=list)
-
-
-class TraktWatchedEpisode(TraktBaseModel):
-    """A watched episode within a watched season."""
-
-    number: int | None = None
-    plays: int | None = None
-    last_watched_at: datetime | None = None
 
 
 class TraktWatchedMovie(TraktBaseModel):
@@ -154,12 +183,6 @@ class TraktSearchResult(TraktBaseModel):
     movie: TraktMovie | None = None
 
 
-class TraktUserSettings(TraktBaseModel):
-    """User settings from Trakt."""
-
-    user: TraktUser | None = None
-
-
 class TraktUser(TraktBaseModel):
     """User resource returned by Trakt."""
 
@@ -169,6 +192,12 @@ class TraktUser(TraktBaseModel):
     vip: bool = False
     vip_ep: bool = False
     ids: TraktIds = msgspec.field(default_factory=TraktIds)
+
+
+class TraktUserSettings(TraktBaseModel):
+    """User settings from Trakt."""
+
+    user: TraktUser | None = None
 
 
 class TraktHistoryItem(TraktBaseModel):
@@ -183,10 +212,32 @@ class TraktHistoryItem(TraktBaseModel):
     episode: TraktEpisode | None = None
 
 
-class TraktEpisode(TraktBaseModel):
-    """Episode resource returned by Trakt."""
+class TraktActivityGroup(TraktBaseModel):
+    """Activity timestamps for one Trakt media group."""
 
-    season: int | None = None
-    number: int | None = None
-    title: str | None = None
-    ids: TraktIds = msgspec.field(default_factory=TraktIds)
+    watched_at: datetime | None = None
+    collected_at: datetime | None = None
+    rated_at: datetime | None = None
+    watchlisted_at: datetime | None = None
+    favorited_at: datetime | None = None
+    commented_at: datetime | None = None
+    paused_at: datetime | None = None
+    hidden_at: datetime | None = None
+    dropped_at: datetime | None = None
+
+
+class TraktUpdatedActivityGroup(TraktBaseModel):
+    """Activity group that only exposes an updated timestamp."""
+
+    updated_at: datetime | None = None
+
+
+class TraktActivities(TraktBaseModel):
+    """Response from /sync/last_activities."""
+
+    all: datetime | None = None
+    movies: TraktActivityGroup | None = None
+    episodes: TraktActivityGroup | None = None
+    shows: TraktActivityGroup | None = None
+    seasons: TraktActivityGroup | None = None
+    watchlist: TraktUpdatedActivityGroup | None = None

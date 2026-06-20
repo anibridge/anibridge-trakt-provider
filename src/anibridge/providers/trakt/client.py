@@ -4,19 +4,22 @@ import asyncio
 import contextlib
 import importlib.metadata
 from datetime import UTC, datetime, tzinfo
+from logging import Logger
 from typing import Any, ClassVar
 
 import aiohttp
 import msgspec
 from anibridge.utils.cache import TTLDict, ttl_cache
 from anibridge.utils.limiter import Limiter
-from anibridge.utils.types import ProviderLogger
 
-from anibridge.providers.list.trakt.models import (
+from anibridge.providers.trakt.models import (
+    TraktActivities,
+    TraktEpisode,
     TraktHistoryItem,
     TraktMovie,
     TraktRating,
     TraktSearchResult,
+    TraktSeason,
     TraktShow,
     TraktUser,
     TraktUserSettings,
@@ -41,7 +44,7 @@ class TraktClient:
     def __init__(
         self,
         *,
-        logger: ProviderLogger,
+        logger: Logger,
         client_id: str,
         client_secret: str,
         token: str,
@@ -206,13 +209,13 @@ class TraktClient:
         if not force_refresh:
             cached = self._show_cache.get(trakt_id)
             if cached is not None:
-                self.log.debug(f"Cache hit $${{trakt_id: {trakt_id}}}$$")
+                self.log.debug("Cache hit $${trakt_id: %s}$$", trakt_id)
                 return cached
         return await self._fetch_show(trakt_id)
 
     async def _fetch_show(self, trakt_id: int) -> TraktShow:
         """Fetch a show from the Trakt API and populate caches."""
-        self.log.debug(f"Pulling Trakt show data from API $${{trakt_id: {trakt_id}}}$$")
+        self.log.debug("Pulling Trakt show data from API $${trakt_id: %s}$$", trakt_id)
         response = await self._make_request(
             "GET",
             f"/shows/{trakt_id}",
@@ -223,6 +226,31 @@ class TraktClient:
             self._show_cache[show.ids.trakt] = show
         return show
 
+    async def get_movie(
+        self,
+        trakt_id: int,
+        *,
+        force_refresh: bool = False,
+    ) -> TraktMovie:
+        """Retrieve movie details by Trakt ID, using cache unless forced."""
+        if not force_refresh:
+            cached = self._movie_cache.get(trakt_id)
+            if cached is not None:
+                return cached
+        return await self._fetch_movie(trakt_id)
+
+    async def _fetch_movie(self, trakt_id: int) -> TraktMovie:
+        """Fetch a movie from the Trakt API and populate caches."""
+        response = await self._make_request(
+            "GET",
+            f"/movies/{trakt_id}",
+            params={"extended": "full"},
+        )
+        movie = msgspec.convert(response, type=TraktMovie)
+        if movie.ids.trakt is not None:
+            self._movie_cache[movie.ids.trakt] = movie
+        return movie
+
     async def search_shows(
         self,
         query: str,
@@ -231,6 +259,19 @@ class TraktClient:
     ) -> list[TraktSearchResult]:
         """Search shows by title."""
         return await self._search(query, limit=min(max(limit, 1), 100))
+
+    async def search_movies(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+    ) -> list[TraktSearchResult]:
+        """Search movies by title."""
+        return await self._search_media_type(
+            "movie",
+            query,
+            limit=min(max(limit, 1), 100),
+        )
 
     @ttl_cache(ttl=300)
     async def _search(
@@ -255,6 +296,35 @@ class TraktClient:
             result = msgspec.convert(item, type=TraktSearchResult)
             if result.show and result.show.ids.trakt is not None:
                 self._show_cache[result.show.ids.trakt] = result.show
+            results.append(result)
+        return results
+
+    @ttl_cache(ttl=300)
+    async def _search_media_type(
+        self,
+        media_type: str,
+        query: str,
+        *,
+        limit: int = 10,
+    ) -> list[TraktSearchResult]:
+        """Cached helper for title searches by Trakt media type."""
+        params = {
+            "query": query,
+            "extended": "full",
+            "limit": limit,
+        }
+        response = await self._make_request(
+            "GET",
+            f"/search/{media_type}",
+            params=params,
+        )
+        results: list[TraktSearchResult] = []
+        for item in response:
+            result = msgspec.convert(item, type=TraktSearchResult)
+            if result.show and result.show.ids.trakt is not None:
+                self._show_cache[result.show.ids.trakt] = result.show
+            if result.movie and result.movie.ids.trakt is not None:
+                self._movie_cache[result.movie.ids.trakt] = result.movie
             results.append(result)
         return results
 
@@ -418,6 +488,104 @@ class TraktClient:
             if trakt_id is not None:
                 self._watchlist_cache[trakt_id] = wl_item
 
+    async def list_items(
+        self,
+    ) -> tuple[
+        tuple[
+            int,
+            TraktShow | TraktMovie,
+            str,
+            TraktWatchedShow | TraktWatchedMovie | None,
+            TraktRating | None,
+            TraktWatchlistItem | None,
+        ],
+        ...,
+    ]:
+        """Return all cached user-state items keyed by Trakt media id."""
+        await self._fetch_watched_shows()
+        await self._fetch_watched_movies()
+        ids = (
+            set(self._list_cache)
+            | set(self._movie_list_cache)
+            | set(self._rating_cache)
+            | set(self._watchlist_cache)
+        )
+        items: list[
+            tuple[
+                int,
+                TraktShow | TraktMovie,
+                str,
+                TraktWatchedShow | TraktWatchedMovie | None,
+                TraktRating | None,
+                TraktWatchlistItem | None,
+            ]
+        ] = []
+        for trakt_id in sorted(ids):
+            watched = self._list_cache.get(trakt_id) or self._movie_list_cache.get(
+                trakt_id
+            )
+            rating = self._rating_cache.get(trakt_id)
+            watchlist_item = self._watchlist_cache.get(trakt_id)
+            media = self._media_from_cached_state(watched, rating, watchlist_item)
+            if media is None:
+                continue
+            media_type = "movie" if isinstance(media, TraktMovie) else "show"
+            items.append((trakt_id, media, media_type, watched, rating, watchlist_item))
+        return tuple(items)
+
+    def _media_from_cached_state(
+        self,
+        watched: TraktWatchedShow | TraktWatchedMovie | None,
+        rating: TraktRating | None,
+        watchlist_item: TraktWatchlistItem | None,
+    ) -> TraktShow | TraktMovie | None:
+        """Return the media object attached to cached Trakt state."""
+        if isinstance(watched, TraktWatchedShow) and watched.show is not None:
+            return watched.show
+        if isinstance(watched, TraktWatchedMovie) and watched.movie is not None:
+            return watched.movie
+        if rating is not None:
+            if rating.show is not None:
+                return rating.show
+            if rating.movie is not None:
+                return rating.movie
+        if watchlist_item is not None:
+            if watchlist_item.show is not None:
+                return watchlist_item.show
+            if watchlist_item.movie is not None:
+                return watchlist_item.movie
+        return None
+
+    async def get_seasons(self, trakt_id: int) -> tuple[TraktSeason, ...]:
+        """Fetch show seasons with episode metadata."""
+        response = await self._make_request(
+            "GET",
+            f"/shows/{trakt_id}/seasons",
+            params={"extended": "episodes"},
+        )
+        return tuple(msgspec.convert(item, type=TraktSeason) for item in response)
+
+    async def get_episode(
+        self,
+        trakt_id: int,
+        season: int,
+        episode: int,
+    ) -> TraktEpisode | None:
+        """Fetch one episode by show id and coordinate."""
+        response = await self._make_request(
+            "GET",
+            f"/shows/{trakt_id}/seasons/{season}/episodes/{episode}",
+            params={"extended": "full"},
+        )
+        if not response:
+            return None
+        return msgspec.convert(response, type=TraktEpisode)
+
+    async def get_activities(self) -> TraktActivities:
+        """Fetch the authenticated user's Trakt last-activity timestamps."""
+        response = await self._make_request("GET", "/sync/last_activities")
+        return msgspec.convert(response, type=TraktActivities)
+
     def _schedule_list_refresh(self) -> None:
         """Schedule a background refresh when caches are stale."""
         if (task := self._bg_task) and not task.done():
@@ -436,6 +604,8 @@ class TraktClient:
         *,
         media_type: str = "show",
         watched_at: datetime | None = None,
+        season: int | None = None,
+        episode: int | None = None,
     ) -> dict[str, Any]:
         """Add a show or movie to the user's watched history."""
         if watched_at is None:
@@ -451,6 +621,25 @@ class TraktClient:
                     }
                 ]
             }
+        elif episode is not None:
+            payload = {
+                "shows": [
+                    {
+                        "ids": {"trakt": trakt_id},
+                        "seasons": [
+                            {
+                                "number": season or 1,
+                                "episodes": [
+                                    {
+                                        "number": episode,
+                                        "watched_at": watched_at.isoformat(),
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            }
         else:
             payload = {
                 "shows": [
@@ -462,25 +651,6 @@ class TraktClient:
             }
 
         result = await self._make_request("POST", "/sync/history", json=payload)
-        self._invalidate_cached_views()
-        return result
-
-    async def remove_from_history(
-        self,
-        trakt_id: int,
-        *,
-        media_type: str = "show",
-    ) -> dict[str, Any]:
-        """Remove a show or movie from the user's watched history."""
-        payload: dict[str, Any]
-        if media_type == "movie":
-            payload = {"movies": [{"ids": {"trakt": trakt_id}}]}
-        else:
-            payload = {"shows": [{"ids": {"trakt": trakt_id}}]}
-
-        result = await self._make_request("POST", "/sync/history/remove", json=payload)
-        self._list_cache.pop(trakt_id, None)
-        self._movie_list_cache.pop(trakt_id, None)
         self._invalidate_cached_views()
         return result
 
@@ -527,13 +697,17 @@ class TraktClient:
         trakt_id: int,
         *,
         media_type: str = "show",
+        notes: str | None = None,
     ) -> dict[str, Any]:
         """Add a show or movie to the user's watchlist."""
         key = "movies" if media_type == "movie" else "shows"
+        item: dict[str, Any] = {"ids": {"trakt": trakt_id}}
+        if notes:
+            item["notes"] = notes
         result = await self._make_request(
             "POST",
             "/sync/watchlist",
-            json={key: [{"ids": {"trakt": trakt_id}}]},
+            json={key: [item]},
         )
         self._watchlist_cache.pop(trakt_id, None)
         return result
@@ -563,7 +737,7 @@ class TraktClient:
         """Fetch history for a specific show or movie."""
         response = await self._make_request(
             "GET",
-            f"/users/me/history/{media_type}/{trakt_id}",
+            f"/sync/history/{media_type}/{trakt_id}",
         )
         return [msgspec.convert(item, type=TraktHistoryItem) for item in response]
 

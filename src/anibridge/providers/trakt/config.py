@@ -5,8 +5,8 @@ from typing import Annotated
 import msgspec
 
 
-class TraktListProviderConfig(msgspec.Struct, kw_only=True):
-    """Configuration for the Trakt list provider."""
+class TraktProviderConfig(msgspec.Struct, kw_only=True):
+    """Configuration for the Trakt provider."""
 
     token: Annotated[
         str,

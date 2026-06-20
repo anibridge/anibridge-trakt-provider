@@ -7,9 +7,9 @@ from typing import Any, cast
 
 import aiohttp
 import pytest
-from anibridge.utils.types import ProviderLogger
 
-from anibridge.providers.list.trakt.client import TraktClient
+from anibridge.providers.trakt.client import TraktClient
+from anibridge.providers.trakt.models import TraktUser, TraktUserSettings
 
 
 class _StubResponse:
@@ -73,7 +73,7 @@ class _StubSession:
 @pytest.fixture()
 def trakt_client() -> TraktClient:
     client = TraktClient(
-        logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
+        logger=getLogger("tests.client"),
         client_id="test-client-id",
         client_secret="test-client-secret",
         token="test-token",
@@ -86,13 +86,13 @@ def trakt_client() -> TraktClient:
 
 def test_default_rate_limiter_is_shared_across_clients() -> None:
     first = TraktClient(
-        logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
+        logger=getLogger("tests.client"),
         client_id="client-id",
         client_secret="secret",
         token="token",
     )
     second = TraktClient(
-        logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
+        logger=getLogger("tests.client"),
         client_id="client-id",
         client_secret="secret",
         token="token",
@@ -105,14 +105,14 @@ def test_default_rate_limiter_is_shared_across_clients() -> None:
 
 def test_custom_rate_limiter_is_local_per_client() -> None:
     first = TraktClient(
-        logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
+        logger=getLogger("tests.client"),
         client_id="client-id",
         client_secret="secret",
         token="token",
         rate_limit=120,
     )
     second = TraktClient(
-        logger=cast(ProviderLogger, getLogger("tests.trakt.client")),
+        logger=getLogger("tests.client"),
         client_id="client-id",
         client_secret="secret",
         token="token",
@@ -154,9 +154,7 @@ async def test_make_request_fails_fast_on_rate_limit(
         nonlocal sleep_calls
         sleep_calls += 1
 
-    monkeypatch.setattr(
-        "anibridge.providers.list.trakt.client.asyncio.sleep", fake_sleep
-    )
+    monkeypatch.setattr("anibridge.providers.trakt.client.asyncio.sleep", fake_sleep)
 
     with pytest.raises(aiohttp.ClientError, match="rate limited"):
         await trakt_client._make_request("GET", "/shows/1")
@@ -181,9 +179,7 @@ async def test_make_request_retries_bad_gateway(
     async def fast_sleep(_seconds: float) -> None:
         return None
 
-    monkeypatch.setattr(
-        "anibridge.providers.list.trakt.client.asyncio.sleep", fast_sleep
-    )
+    monkeypatch.setattr("anibridge.providers.trakt.client.asyncio.sleep", fast_sleep)
 
     result = await trakt_client._make_request("GET", "/shows/1")
 
@@ -277,8 +273,6 @@ async def test_initialize_sets_user_and_primes_cache(
 
     async def fake_get_settings():
         calls.append("settings")
-        from anibridge.providers.list.trakt.models import TraktUser, TraktUserSettings
-
         return TraktUserSettings(user=TraktUser(username="tester", name="Test User"))
 
     async def fake_fetch_watched_shows():

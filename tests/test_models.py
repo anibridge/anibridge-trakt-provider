@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import msgspec
 
-from anibridge.providers.list.trakt.models import (
+from anibridge.providers.trakt.models import (
     TraktEpisode,
     TraktHistoryItem,
     TraktIds,

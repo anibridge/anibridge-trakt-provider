@@ -7,7 +7,7 @@ _This provider comes built-in with AniBridge, so you don't need to install it se
 ## Configuration
 
 ```yaml
-list_provider_config:
+target_provider_config:
   trakt:
     token: ...
     # client_id: "fab91d3719c4206245850c46022ba5a571677ee62a886cfd8da8fc93db4e9f7c"
