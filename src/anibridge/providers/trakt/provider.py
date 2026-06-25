@@ -46,7 +46,6 @@ from anibridge.provider.base import (
     Record,
     RecordChange,
     RecordField,
-    RecordKind,
     RecordQuery,
     RecordSpec,
     RecordWrite,
@@ -92,7 +91,7 @@ from anibridge.providers.trakt.models import (
 
 __all__ = ["TraktProvider"]
 
-_PROGRESS_KIND = "progress"
+_USER_STATE_SURFACE = "user_state"
 _SCROBBLE = "scrobble"
 _ALL_RECORD_FIELDS = frozenset(RecordField)
 
@@ -182,7 +181,7 @@ class TraktProvider(
             ),
             records=(
                 RecordSpec(
-                    kind=Descriptor(_PROGRESS_KIND, RecordKind.PROGRESS),
+                    surface=_USER_STATE_SURFACE,
                     fields={
                         RecordField.STATUS: FieldSpec(
                             RecordField.STATUS,
@@ -432,7 +431,7 @@ class TraktProvider(
                         media_type,
                         rating,
                         watchlist_item,
-                        query.native_record_kinds,
+                        query.record_surfaces,
                         query.record_fields,
                     )
                 )
@@ -473,7 +472,7 @@ class TraktProvider(
                     media_type,
                     rating,
                     watchlist_item,
-                    frozenset(query.native_record_kinds),
+                    frozenset(query.record_surfaces),
                     query.fields,
                 )
             )
@@ -566,7 +565,7 @@ class TraktProvider(
                 changes.append(
                     RecordChange(
                         key=group_name,
-                        kind=_PROGRESS_KIND,
+                        surface=_USER_STATE_SURFACE,
                         at=self._utc(group.rated_at),
                     )
                 )
@@ -574,7 +573,7 @@ class TraktProvider(
                 changes.append(
                     RecordChange(
                         key=group_name,
-                        kind=_PROGRESS_KIND,
+                        surface=_USER_STATE_SURFACE,
                         at=self._utc(group.watchlisted_at),
                     )
                 )
@@ -593,7 +592,7 @@ class TraktProvider(
             changes.append(
                 RecordChange(
                     key="watchlist",
-                    kind=_PROGRESS_KIND,
+                    surface=_USER_STATE_SURFACE,
                     at=self._utc(activities.watchlist.updated_at),
                 )
             )
@@ -601,9 +600,9 @@ class TraktProvider(
 
     async def _upsert_record(self, write: UpsertRecord) -> WriteResult:
         media_type, trakt_id = self._parse_ref_key(write.ref.key)
-        kind = write.kind
-        if kind != _PROGRESS_KIND:
-            raise ValueError(f"Unsupported Trakt record kind {kind!r}")
+        surface = write.surface
+        if surface != _USER_STATE_SURFACE:
+            raise ValueError(f"Unsupported Trakt record surface {surface!r}")
 
         changed = False
         status_value = write.set.get(RecordField.STATUS)
@@ -643,13 +642,15 @@ class TraktProvider(
             )
             changed = True
         if not changed:
-            raise ValueError("Trakt progress record requires status, notes, or rating")
+            raise ValueError(
+                "Trakt user-state record requires status, notes, or rating"
+            )
         return WriteResult(
             ok=True,
             op=WriteOp.UPSERT_RECORD,
             token=write.token,
             ref=write.ref,
-            key=self._record_key(kind, write.ref),
+            key=self._record_key(surface, write.ref),
         )
 
     async def _delete_record(self, write: DeleteRecord) -> WriteResult:
@@ -663,9 +664,9 @@ class TraktProvider(
                 error="Trakt delete requires a ref",
             )
         media_type, trakt_id = self._parse_ref_key(ref.key)
-        kind = write.kind
-        if kind != _PROGRESS_KIND:
-            raise ValueError(f"Unsupported Trakt record kind {kind!r}")
+        surface = write.surface
+        if surface != _USER_STATE_SURFACE:
+            raise ValueError(f"Unsupported Trakt record surface {surface!r}")
         await self._client.remove_from_watchlist(trakt_id, media_type=media_type)
         await self._client.remove_rating(trakt_id, media_type=media_type)
         return WriteResult(
@@ -673,7 +674,7 @@ class TraktProvider(
             op=WriteOp.DELETE_RECORD,
             token=write.token,
             ref=ref,
-            key=self._record_key(kind, ref),
+            key=self._record_key(surface, ref),
         )
 
     async def _append_event(self, write: AppendEvent) -> WriteResult:
@@ -702,11 +703,11 @@ class TraktProvider(
         media_type: str,
         rating: TraktRating | None,
         watchlist_item: TraktWatchlistItem | None,
-        kinds: frozenset[str],
+        surfaces: frozenset[str],
         fields: frozenset[RecordField],
     ) -> list[Record]:
         records: list[Record] = []
-        if (not kinds or _PROGRESS_KIND in kinds) and (
+        if (not surfaces or _USER_STATE_SURFACE in surfaces) and (
             rating is not None or watchlist_item is not None
         ):
             records.append(
@@ -756,20 +757,20 @@ class TraktProvider(
                 datetime,
                 self._utc(rating.rated_at),
             )
-        return self._record(media, media_type, _PROGRESS_KIND, values)
+        return self._record(media, media_type, _USER_STATE_SURFACE, values)
 
     def _record(
         self,
         media: TraktShow | TraktMovie,
         media_type: str,
-        kind: str,
+        surface: str,
         values: Mapping[RecordField, Value],
     ) -> Record:
         ref = Ref.anchor(self._ref_key(media_type, media.ids.trakt))
         return Record(
             ref=ref,
-            kind=kind,
-            key=self._record_key(kind, ref),
+            surface=surface,
+            key=self._record_key(surface, ref),
             url=self._url_for_media(media, media_type),
             ids=self._ids_from_media(media, media_type),
             values=values,

@@ -3,12 +3,12 @@
 import logging
 from datetime import UTC, datetime
 
+import pytest
 from anibridge.provider.base import (
     AppendEvent,
     EventKind,
     Rating,
     RecordField,
-    RecordKind,
     Ref,
     State,
     Status,
@@ -29,15 +29,12 @@ def _provider() -> TraktProvider:
     return TraktProvider(logger=logging.getLogger("test"), config={"token": "token"})
 
 
-def test_capabilities_use_progress_records_and_scrobble_events() -> None:
+def test_capabilities_use_user_state_records_and_scrobble_events() -> None:
     provider = _provider()
     capabilities = provider.capabilities()
 
-    assert [record.kind.semantic for record in capabilities.records] == [
-        RecordKind.PROGRESS
-    ]
     record = capabilities.records[0]
-    assert record.kind.native == "progress"
+    assert record.surface == "user_state"
     assert record.write_ops == frozenset({WriteOp.UPSERT_RECORD, WriteOp.DELETE_RECORD})
     assert record.fields[RecordField.STATUS].writable is True
     assert record.fields[RecordField.RATING].writable is True
@@ -47,7 +44,7 @@ def test_capabilities_use_progress_records_and_scrobble_events() -> None:
     ]
 
 
-def test_progress_record_combines_watchlist_and_rating_fields() -> None:
+def test_user_state_record_combines_watchlist_and_rating_fields() -> None:
     provider = _provider()
     listed_at = datetime(2026, 1, 1, tzinfo=UTC)
     rated_at = datetime(2026, 1, 2, tzinfo=UTC)
@@ -57,13 +54,13 @@ def test_progress_record_combines_watchlist_and_rating_fields() -> None:
         "movie",
         TraktRating(rating=8, rated_at=rated_at),
         TraktWatchlistItem(listed_at=listed_at, notes="later"),
-        frozenset({"progress"}),
+        frozenset({"user_state"}),
         frozenset(),
     )
 
     assert len(records) == 1
     record = records[0]
-    assert record.kind == "progress"
+    assert record.surface == "user_state"
     assert record.values[RecordField.STATUS] == State(
         native="planned", status=Status.PLANNED
     )
@@ -73,7 +70,8 @@ def test_progress_record_combines_watchlist_and_rating_fields() -> None:
     assert record.values[RecordField.LAST_ACTIVITY_AT] == rated_at
 
 
-async def test_progress_record_writes_watchlist_and_rating(monkeypatch) -> None:
+@pytest.mark.asyncio()
+async def test_user_state_record_writes_watchlist_and_rating(monkeypatch) -> None:
     provider = _provider()
     calls: list[tuple[str, object]] = []
 
@@ -89,7 +87,7 @@ async def test_progress_record_writes_watchlist_and_rating(monkeypatch) -> None:
     result = await provider._upsert_record(
         UpsertRecord(
             ref=Ref.anchor("movie:123"),
-            kind="progress",
+            surface="user_state",
             set={
                 RecordField.STATUS: State(status=Status.PLANNED),
                 RecordField.NOTES: "later",
@@ -105,7 +103,8 @@ async def test_progress_record_writes_watchlist_and_rating(monkeypatch) -> None:
     ]
 
 
-async def test_progress_record_status_clear_does_not_recreate_watchlist(
+@pytest.mark.asyncio()
+async def test_user_state_record_status_clear_does_not_recreate_watchlist(
     monkeypatch,
 ) -> None:
     provider = _provider()
@@ -127,7 +126,7 @@ async def test_progress_record_status_clear_does_not_recreate_watchlist(
     result = await provider._upsert_record(
         UpsertRecord(
             ref=Ref.anchor("movie:123"),
-            kind="progress",
+            surface="user_state",
             clear=frozenset({RecordField.STATUS, RecordField.NOTES}),
         )
     )
@@ -136,6 +135,7 @@ async def test_progress_record_status_clear_does_not_recreate_watchlist(
     assert calls == [("remove_watchlist", (123, "movie"))]
 
 
+@pytest.mark.asyncio()
 async def test_scrobble_writes_stay_on_event_channel(monkeypatch) -> None:
     provider = _provider()
     calls: list[tuple[object, ...]] = []
