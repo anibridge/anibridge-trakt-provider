@@ -9,11 +9,11 @@ from anibridge.provider.base import (
     EventKind,
     Rating,
     RecordField,
+    RecordWriteOp,
     Ref,
     State,
     Status,
     UpsertRecord,
-    WriteOp,
 )
 
 from anibridge.providers.trakt.models import (
@@ -35,7 +35,7 @@ def test_capabilities_use_user_state_records_and_scrobble_events() -> None:
 
     record = capabilities.records[0]
     assert record.surface == "user_state"
-    assert record.write_ops == frozenset({WriteOp.UPSERT_RECORD, WriteOp.DELETE_RECORD})
+    assert record.write_ops == frozenset({RecordWriteOp.UPSERT, RecordWriteOp.DELETE})
     assert record.fields[RecordField.STATUS].writable is True
     assert record.fields[RecordField.RATING].writable is True
     assert RecordField.PROGRESS not in record.fields

@@ -24,6 +24,7 @@ from anibridge.provider.base import (
     EventQuery,
     EventSpec,
     EventWrite,
+    EventWriteOp,
     ExternalId,
     Facet,
     FacetName,
@@ -49,6 +50,7 @@ from anibridge.provider.base import (
     RecordQuery,
     RecordSpec,
     RecordWrite,
+    RecordWriteOp,
     Ref,
     Role,
     ScanItem,
@@ -75,7 +77,6 @@ from anibridge.provider.base import (
     UpsertRecord,
     Value,
     WriteError,
-    WriteOp,
     WriteResult,
 )
 
@@ -220,13 +221,13 @@ class TraktProvider(
                             ),
                         ),
                     },
-                    write_ops=frozenset({WriteOp.UPSERT_RECORD, WriteOp.DELETE_RECORD}),
+                    write_ops=frozenset({RecordWriteOp.UPSERT, RecordWriteOp.DELETE}),
                 ),
             ),
             events=(
                 EventSpec(
                     Descriptor(_SCROBBLE, EventKind.SCROBBLE),
-                    write_ops=frozenset({WriteOp.APPEND_EVENT}),
+                    write_ops=frozenset({EventWriteOp.APPEND}),
                 ),
             ),
             change_kinds=frozenset(
@@ -492,9 +493,9 @@ class TraktProvider(
                     result = await self._delete_record(write)
             except Exception as exc:
                 op = (
-                    WriteOp.DELETE_RECORD
+                    RecordWriteOp.DELETE
                     if isinstance(write, DeleteRecord)
-                    else WriteOp.UPSERT_RECORD
+                    else RecordWriteOp.UPSERT
                 )
                 result = WriteResult(
                     ok=False,
@@ -526,12 +527,14 @@ class TraktProvider(
         """Apply Trakt event writes."""
         results: list[WriteResult] = []
         for write in writes:
+            if not isinstance(write, AppendEvent):
+                continue
             try:
                 result = await self._append_event(write)
             except Exception as exc:
                 result = WriteResult(
                     ok=False,
-                    op=WriteOp.APPEND_EVENT,
+                    op=EventWriteOp.APPEND,
                     token=write.token,
                     ref=write.ref,
                     code=self._write_error_for_exception(exc),
@@ -647,7 +650,7 @@ class TraktProvider(
             )
         return WriteResult(
             ok=True,
-            op=WriteOp.UPSERT_RECORD,
+            op=RecordWriteOp.UPSERT,
             token=write.token,
             ref=write.ref,
             key=self._record_key(surface, write.ref),
@@ -658,7 +661,7 @@ class TraktProvider(
         if ref is None:
             return WriteResult(
                 ok=False,
-                op=WriteOp.DELETE_RECORD,
+                op=RecordWriteOp.DELETE,
                 token=write.token,
                 code=WriteError.INVALID,
                 error="Trakt delete requires a ref",
@@ -671,7 +674,7 @@ class TraktProvider(
         await self._client.remove_rating(trakt_id, media_type=media_type)
         return WriteResult(
             ok=True,
-            op=WriteOp.DELETE_RECORD,
+            op=RecordWriteOp.DELETE,
             token=write.token,
             ref=ref,
             key=self._record_key(surface, ref),
@@ -679,7 +682,7 @@ class TraktProvider(
 
     async def _append_event(self, write: AppendEvent) -> WriteResult:
         if write.kind and write.kind != _SCROBBLE:
-            return self._unsupported_event(write.token, write.ref, WriteOp.APPEND_EVENT)
+            return self._unsupported_event(write.token, write.ref, EventWriteOp.APPEND)
         media_type, trakt_id = self._parse_ref_key(write.ref.key)
         season, episode = self._episode_coordinate(write.ref)
         await self._client.add_to_history(
@@ -691,7 +694,7 @@ class TraktProvider(
         )
         return WriteResult(
             ok=True,
-            op=WriteOp.APPEND_EVENT,
+            op=EventWriteOp.APPEND,
             token=write.token,
             ref=write.ref,
             key=self._event_key(write.ref, write.at),
@@ -1079,7 +1082,7 @@ class TraktProvider(
     def _unsupported_event(
         token: str | None,
         ref: Ref | None,
-        op: WriteOp,
+        op: EventWriteOp,
     ) -> WriteResult:
         return WriteResult(
             ok=False,
