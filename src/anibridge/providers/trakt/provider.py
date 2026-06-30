@@ -445,6 +445,9 @@ class TraktProvider(
 
     async def fetch_records(self, query: RecordQuery) -> Page[Record]:
         """Fetch Trakt records by ref or record key."""
+        if query.record_surfaces and _USER_STATE_SURFACE not in query.record_surfaces:
+            return Page(items=())
+
         refs = tuple(query.refs)
         if not refs and query.keys:
             refs = tuple(

@@ -9,6 +9,7 @@ from anibridge.provider.base import (
     EventKind,
     Rating,
     RecordField,
+    RecordQuery,
     RecordWriteOp,
     Ref,
     State,
@@ -68,6 +69,22 @@ def test_user_state_record_combines_watchlist_and_rating_fields() -> None:
     assert record.values[RecordField.NOTES] == "later"
     assert record.values[RecordField.RATING] == Rating(8.0, (1, 10, 1))
     assert record.values[RecordField.LAST_ACTIVITY_AT] == rated_at
+
+
+@pytest.mark.asyncio()
+async def test_fetch_records_short_circuits_unmatched_surface(monkeypatch) -> None:
+    provider = _provider()
+
+    async def list_items():
+        raise AssertionError("unmatched record surface should not query Trakt")
+
+    monkeypatch.setattr(provider._client, "list_items", list_items)
+
+    page = await provider.fetch_records(
+        RecordQuery(record_surfaces=("unsupported",), refs=(Ref.anchor("movie:123"),))
+    )
+
+    assert page.items == ()
 
 
 @pytest.mark.asyncio()
